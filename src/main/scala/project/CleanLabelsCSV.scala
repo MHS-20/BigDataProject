@@ -9,12 +9,13 @@ import java.io.PrintWriter
 object CSVLabelCleaner {
   def main(args: Array[String]): Unit = {
 
-    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset18.csv"
-    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset28.csv"
+    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset23.csv"
+    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset23-2.csv"
+
+    val lines = Source.fromFile(inputFile).getLines().toList
+    val writer = new PrintWriter(outputFile)
 
     try {
-      val lines = Source.fromFile(inputFile).getLines().toList
-      val writer = new PrintWriter(outputFile)
       lines.zipWithIndex.foreach { case (line, idx) =>
         if (idx == 0) {
           // Process header: extract column names and rename last column

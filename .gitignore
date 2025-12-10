@@ -8,8 +8,7 @@ datasets/big/
 aws/credentials
 aws/keys/*
 
-dataset18.csv
-dataset28.csv
+*.csv
 
 # Created by https://www.gitignore.io/api/java,linux,macos,gradle,windows,eclipse,intellij
 # Edit at https://www.gitignore.io/?templates=java,linux,macos,gradle,windows,eclipse,intellij
