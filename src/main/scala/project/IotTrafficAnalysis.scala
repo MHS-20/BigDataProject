@@ -5,7 +5,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 object IoTTrafficAnalysis {
-
   case class TrafficRecord(
                             ts: Double,
                             uid: String,
@@ -57,6 +56,15 @@ object IoTTrafficAnalysis {
                                 malicious_percent: Double
                               )
 
+  case class CategoryStats(
+                            traffic_class: String,
+                            label: String,
+                            avg_bytes: Double,
+                            avg_duration: Double,
+                            avg_packets: Double,
+                            count: Long
+                          )
+
   def main(args: Array[String]): Unit = {
 
     val conf = new SparkConf()
@@ -95,15 +103,8 @@ object IoTTrafficAnalysis {
         (ip, IPProfile(ip, avgBytes, totalBytes, count, avgDur, trafficClass))
       }
 
-    // Cache IP profiles for reuse
     ipProfileRDD.cache()
-
-    println("\n--- IP Traffic Classification ---")
-    ipProfileRDD
-      .take(20)
-      .foreach { case (ip, profile) =>
-        println(f"IP: $ip%-15s | Class: ${profile.traffic_class}%-30s | Connections: ${profile.connection_count}%5d | Avg Bytes: ${profile.avg_bytes_sent}%10.2f")
-      }
+    printIPProfiles(ipProfileRDD.take(20))
 
     // SECOND SHUFFLE: Join back with original dataset
     val trafficWithIP = dataRDD.map(r => (r.id_orig_h, r))
@@ -127,42 +128,24 @@ object IoTTrafficAnalysis {
       .map { case (trafficClass, countsMap) => createTrafficClassStats(trafficClass, countsMap) }
       .sortBy(_.traffic_class)
 
-    println("\n--- Label Distribution by Traffic Category ---")
-    println(f"${"Traffic Category"}%-30s | ${"Benign"}%-12s | ${"Malicious"}%-12s | ${"Total"}%-12s | ${"Benign %"}%-10s | ${"Malicious %"}%-12s")
-    println("-" * 110)
-
-    labelByCategory
-      .take(20)
-      .foreach { stats =>
-        println(f"${stats.traffic_class}%-30s | ${stats.benign}%12d | ${stats.malicious}%12d | ${stats.total}%12d | ${stats.benign_percent}%9.2f%% | ${stats.malicious_percent}%11.2f%%")
-      }
+    printLabelDistribution(labelByCategory.take(20))
 
     // Statistical summary by category
-    println("\n--- Statistical Summary by Traffic Category ---")
     val categoryStats = enrichedRDD
       .map(e => ((e.profile.traffic_class, e.record.label), (e.record.orig_bytes, e.record.duration, e.record.orig_pkts, 1L)))
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
-        ((tc, lbl), totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt)}
-      .collect()
-      .groupBy(_._1._1)
+        CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
+      .sortBy(cs => (cs.traffic_class, cs.label))
+    //.groupBy(_.traffic_class)
+      //.collect()
 
-    println(f"${"Traffic Category"}%-30s | ${"Label"}%-10s | ${"Avg Bytes"}%-12s | ${"Avg Duration"}%-12s | ${"Avg Packets"}%-12s | ${"Count"}%-12s")
-    println("-" * 120)
-
-    categoryStats.toSeq.sortBy(_._1).foreach { case (trafficClass, records) =>
-      records.foreach { case ((_, label), avgBytes, avgDur, avgPkts, count) =>
-        println(f"$trafficClass%-30s | $label%-10s | $avgBytes%12.2f | $avgDur%12.6f | $avgPkts%12.2f | $count%12d")
-      }
-    }
-
-    printCategoryStats(enrichedRDD)
+    printCategoryStats(categoryStats.take(20))
     saveResults(labelByCategory, ipProfileRDD)
 
     println("\n=== Analysis Complete ===")
     sc.stop()
   }
-
 
   def classifyTraffic(connectionCount: Long, avgBytes: Double): String = {
     if (connectionCount < 10) {
@@ -195,16 +178,15 @@ object IoTTrafficAnalysis {
     }
   }
 
-  def printCategoryStats(categoryStats:) : Unit = {
+  def printCategoryStats(categoryStats: Array[CategoryStats]): Unit = {
     println("\n--- Statistical Summary by Traffic Category ---")
     println(f"${"Traffic Category"}%-30s | ${"Label"}%-10s | ${"Avg Bytes"}%-12s | ${"Avg Duration"}%-12s | ${"Avg Packets"}%-12s | ${"Count"}%-12s")
     println("-" * 120)
-    categoryStats.toSeq.sortBy(_._1).foreach { case (trafficClass, records) =>
-      records.foreach { case ((_, label), avgBytes, avgDur, avgPkts, count) =>
-        println(f"$trafficClass%-30s | $label%-10s | $avgBytes%12.2f | $avgDur%12.6f | $avgPkts%12.2f | $count%12d")
-      }
+    categoryStats.foreach { cs =>
+      println(f"${cs.traffic_class}%-30s | ${cs.label}%-10s | ${cs.avg_bytes}%12.2f | ${cs.avg_duration}%12.6f | ${cs.avg_packets}%12.2f | ${cs.count}%12d")
     }
   }
+
 
   // -------------------- UTILITY FUNCTIONS --------------------
   def saveResults(labelByCategory: org.apache.spark.rdd.RDD[TrafficClassStats],
@@ -306,6 +288,4 @@ object IoTTrafficAnalysis {
       case _: Exception => 0
     }
   }
-
-
 }
