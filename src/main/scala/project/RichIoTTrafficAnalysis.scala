@@ -61,7 +61,7 @@ object RichIoTTrafficAnalysis {
     sc.setLogLevel("ERROR")
 
     println("=== IoT Traffic Analysis ===")
-    val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset23-2.csv")
+    val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
     val dataRDD = rawData
