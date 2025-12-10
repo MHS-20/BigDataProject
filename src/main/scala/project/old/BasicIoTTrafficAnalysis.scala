@@ -1,11 +1,10 @@
-package project
+package project.old
 
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import org.apache.spark.{SparkConf, SparkContext}
+
+import java.time.{Instant, ZoneId}
 
 object BasicIoTTrafficAnalysis {
 
