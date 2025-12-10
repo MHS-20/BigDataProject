@@ -4,7 +4,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import java.text.SimpleDateFormat
 import java.util.Date
 
-object IoTTrafficAnalysis {
+object RichIoTTrafficAnalysis {
 
   case class TrafficRecord(
                             ts: Double,

@@ -7,7 +7,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-object BasicIoTNetworkTrafficAnalysis {
+object BasicIoTTrafficAnalysis {
 
   // Case class for network traffic record
   case class NetworkTraffic(
