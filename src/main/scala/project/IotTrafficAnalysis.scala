@@ -57,7 +57,6 @@ object IoTTrafficAnalysis {
 
     enrichedRDD.cache()
 
-    // versione non ottimizzata
 //    // THIRD SHUFFLE: Compute traffic patterns by label
 //    val labelByCategory = enrichedRDD
 //      .map(e => ((e.profile.traffic_class, e.record.label), 1L))
@@ -69,7 +68,8 @@ object IoTTrafficAnalysis {
 //
 //    printLabelDistribution(labelByCategory.take(20))
 
-    // versione ottimizzata
+    // versione migliore
+    // TODO: in realtà hai solo tolto un livello di aggregazione, hai tolo l'unione delle stesse classi, che era inutile, ma non è una vera ottimizzazione
     // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
       .map(e => ((e.profile.traffic_class, e.record.label), (e.record.orig_bytes, e.record.duration, e.record.orig_pkts, 1L)))
