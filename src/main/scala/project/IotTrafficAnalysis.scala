@@ -16,7 +16,7 @@ object IoTTrafficAnalysis {
     sc.setLogLevel("ERROR")
 
     println("=== IoT Traffic Analysis ===")
-    val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset52.csv")
+    val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
     val dataRDD = rawData
@@ -57,29 +57,31 @@ object IoTTrafficAnalysis {
 
     enrichedRDD.cache()
 
-    // THIRD SHUFFLE: Compute traffic patterns by label
-    val labelByCategory = enrichedRDD
-      .map(e => ((e.profile.traffic_class, e.record.label), 1L))
-      .reduceByKey(_ + _)
-      .map { case ((trafficClass, label), count) => (trafficClass, Map(label -> count)) }
-      .reduceByKey(_ ++ _)
-      .map { case (trafficClass, countsMap) => createTrafficClassStats(trafficClass, countsMap) }
-      .sortBy(_.traffic_class)
+    // versione non ottimizzata
+//    // THIRD SHUFFLE: Compute traffic patterns by label
+//    val labelByCategory = enrichedRDD
+//      .map(e => ((e.profile.traffic_class, e.record.label), 1L))
+//      .reduceByKey(_ + _)
+//      .map { case ((trafficClass, label), count) => (trafficClass, Map(label -> count)) }
+//      .reduceByKey(_ ++ _)
+//      .map { case (trafficClass, countsMap) => createTrafficClassStats(trafficClass, countsMap) }
+//      //.sortBy(_.traffic_class)
+//
+//    printLabelDistribution(labelByCategory.take(20))
 
-    printLabelDistribution(labelByCategory.take(20))
-
-    // Statistical summary by category
+    // versione ottimizzata
+    // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
       .map(e => ((e.profile.traffic_class, e.record.label), (e.record.orig_bytes, e.record.duration, e.record.orig_pkts, 1L)))
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
-      .sortBy(cs => (cs.traffic_class, cs.label))
+      //.sortBy(cs => (cs.traffic_class, cs.label))
     //.groupBy(_.traffic_class)
       //.collect()
 
     printCategoryStats(categoryStats.take(20))
-    saveResults(sc, labelByCategory, ipProfileRDD)
+    // saveResults(sc, labelByCategory, ipProfileRDD)
 
     println("\n=== Analysis Complete ===")
     sc.stop()
