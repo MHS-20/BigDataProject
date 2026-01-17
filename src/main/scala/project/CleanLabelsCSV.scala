@@ -9,8 +9,8 @@ import java.io.PrintWriter
 object CSVLabelCleaner {
   def main(args: Array[String]): Unit = {
 
-    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset23.csv"
-    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset23-2.csv"
+    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset18.csv"
+    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset18-2.csv"
 
     val lines = Source.fromFile(inputFile).getLines().toList
     val writer = new PrintWriter(outputFile)

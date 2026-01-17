@@ -2,6 +2,7 @@ package project
 
 import org.apache.spark.{SparkConf, SparkContext}
 import project.IoTTrafficUtilities._
+import utils.Commons._
 
 object IoTTrafficAnalysis {
   def main(args: Array[String]): Unit = {
@@ -13,10 +14,12 @@ object IoTTrafficAnalysis {
       .set("spark.driver.extraJavaOptions", "-Xmx6g -Xms4g")
 
     val sc = new SparkContext(conf)
+    initializeSparkContext("remote", sc)
     sc.setLogLevel("ERROR")
 
     println("=== IoT Traffic Analysis ===")
-    val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
+    val rawData = sc.textFile(getDatasetPath(args{0}, args{1}))
+    //val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
     val dataRDD = rawData
