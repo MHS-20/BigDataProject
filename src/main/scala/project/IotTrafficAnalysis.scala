@@ -67,18 +67,4 @@ object IoTTrafficAnalysis {
     println("\n=== Analysis Complete ===")
     sc.stop()
   }
-
-  def classifyTraffic(connectionCount: Long, avgBytes: Double): String = {
-    if (connectionCount < 10) {
-      "Low Activity"
-    } else if (connectionCount >= 10 && connectionCount < 50) {
-      "Normal Activity"
-    } else if (connectionCount >= 50 && avgBytes < 1000) {
-      "High Frequency Low Volume"
-    } else if (connectionCount >= 50 && avgBytes >= 1000) {
-      "High Frequency High Volume"
-    } else {
-      "Unknown"
-    }
-  }
 }

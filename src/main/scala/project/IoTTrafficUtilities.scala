@@ -7,6 +7,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 object IoTTrafficUtilities {
+  def classifyTraffic(connectionCount: Long, avgBytes: Double): String = {
+    if (connectionCount < 10) {
+      "Low Activity"
+    } else if (connectionCount >= 10 && connectionCount < 50) {
+      "Normal Activity"
+    } else if (connectionCount >= 50 && avgBytes < 1000) {
+      "High Frequency Low Volume"
+    } else if (connectionCount >= 50 && avgBytes >= 1000) {
+      "High Frequency High Volume"
+    } else {
+      "Unknown"
+    }
+  }
+
   // -------------------- PRINT FUNCTIONS --------------------
   def printIPProfiles(profiles: Array[(String, IPProfile)]): Unit = {
     println("\n--- IP Traffic Classification ---")
@@ -30,6 +44,20 @@ object IoTTrafficUtilities {
     println("-" * 120)
     categoryStats.foreach { cs =>
       println(f"${cs.traffic_class}%-30s | ${cs.label}%-10s | ${cs.avg_bytes}%12.2f | ${cs.avg_duration}%12.6f | ${cs.avg_packets}%12.2f | ${cs.count}%12d")
+    }
+  }
+
+  def printIPProfilesEnriched(profiles: Array[(String, IPProfileEnriched)]): Unit = {
+    println("\n--- IP Traffic Classification ---")
+    profiles.foreach { case (ip, profile) =>
+      println(
+        f"IP: $ip%-15s | " +
+          f"Class: ${profile.traffic_class}%-30s | " +
+          f"Connections: ${profile.connection_count}%5d | " +
+          f"Avg Bytes: ${profile.avg_bytes_sent}%10.2f | " +
+          f"Benign %%: ${profile.benign_percent}%6.2f%%%% | " +
+          f"Malicious %%: ${profile.malicious_percent}%6.2f%%%%"
+      )
     }
   }
 
@@ -59,6 +87,30 @@ object IoTTrafficUtilities {
         s"${profile.id_orig_h},${profile.avg_bytes_sent},${profile.total_bytes_sent},${profile.connection_count},${profile.avg_duration},${profile.traffic_class}"}
       .coalesce(1)
       .saveAsTextFile(ipOutputPath)
+  }
+
+  def saveResultsOptimized(sc: SparkContext,
+                  categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
+                  ipProfiles: org.apache.spark.rdd.RDD[(String, IPProfileEnriched)]): Unit = {
+    val outputPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\output"
+
+    try {
+      categoryStats
+        .map(s => s"${s.traffic_class},${s.label},${s.count},${s.avg_duration},${s.avg_bytes},${s.avg_packets}")
+        .saveAsTextFile(s"$outputPath/traffic_class_stats")
+
+      ipProfiles
+        .map { case (ip, p) =>
+          s"${p.id_orig_h},${p.avg_bytes_sent},${p.total_bytes_sent},${p.connection_count}," +
+            s"${p.avg_duration},${p.traffic_class},${p.benign_count},${p.malicious_count}," +
+            s"${p.benign_percent},${p.malicious_percent}"
+        }
+        .saveAsTextFile(s"$outputPath/ip_profiles_enriched")
+
+      println(s"\nResults saved to: $outputPath")
+    } catch {
+      case e: Exception => println(s"Warning: Could not save results - ${e.getMessage}")
+    }
   }
 
   def createTrafficClassStats(trafficClass: String, countsMap: Map[String, Long]): TrafficClassStats = {

@@ -51,41 +51,8 @@ object IoTTrafficAnalysisOptimized {
     ipProfileRDD.cache()
     printIPProfilesEnriched(ipProfileRDD.take(20))
 
-    // SECOND SHUFFLE: statistical summary by category and label senza join
-//    val categoryStats = ipProfileRDD
-//      .flatMap { case (_, profile) =>
-//        // Per ogni IP generiamo una entry per ciascun label presente
-//        Seq(
-//          ("benign", profile.benign_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count),
-//          ("malicious", profile.malicious_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count)
-//        )
-//          .filter(_._2 > 0) // ignora label con count = 0
-//          .map { case (label, count, avgBytes, avgDur, totalConns) =>
-//            ((profile.traffic_class, label), (avgBytes * count, avgDur * count, count))
-//          }
-//      }
-//      .combineByKey(
-//        // createCombiner
-//        (v: (Double, Double, Long)) => v,
-//        // mergeValue (all’interno della stessa partizione)
-//        (acc: (Double, Double, Long), v: (Double, Double, Long)) =>
-//          (acc._1 + v._1, acc._2 + v._2, acc._3 + v._3),
-//        // mergeCombiners (tra partizioni)
-//        (acc1: (Double, Double, Long), acc2: (Double, Double, Long)) =>
-//          (acc1._1 + acc2._1, acc1._2 + acc2._2, acc1._3 + acc2._3)
-//      )
-//      .map { case ((trafficClass, label), (totBytes, totDur, totCount)) =>
-//        CategoryStats(
-//          trafficClass,
-//          label,
-//          totBytes / totCount,
-//          totDur / totCount,
-//          0.0,   // avg_packets: se serve, puoi aggiungerlo nello stesso modo
-//          totCount
-//        )
-//      }
-
-    // crea una riga per ogni coppia (ip, label)
+    // SECOND SHUFFLE: Statistical summary by category
+    // crea una riga per ogni coppia (ip, security label)
     val perCategoryRDD = ipProfileRDD.flatMap { case (_, profile) =>
       Seq(((profile.traffic_class, "benign"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.benign_count)),
         ((profile.traffic_class, "malicious"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.malicious_count)))
@@ -99,69 +66,14 @@ object IoTTrafficAnalysisOptimized {
           label,
           avg_bytes    = totBytes.toDouble / count,
           avg_duration = totDur / count,
-          avg_packets  = 0.0, // non disponibile nell’IPProfileEnriched
+          avg_packets  = 0.0,
           count        = count
         )
       }
 
     printCategoryStats(categoryStats.collect())
-
-   // saveResults(sc, categoryStats, ipProfileRDD)
-
+   // saveResultsOptimized(sc, categoryStats, ipProfileRDD)
     println("\n=== Analysis Complete ===")
     sc.stop()
-  }
-
-  def classifyTraffic(connectionCount: Long, avgBytes: Double): String = {
-    if (connectionCount < 10) {
-      "Low Activity"
-    } else if (connectionCount >= 10 && connectionCount < 50) {
-      "Normal Activity"
-    } else if (connectionCount >= 50 && avgBytes < 1000) {
-      "High Frequency Low Volume"
-    } else if (connectionCount >= 50 && avgBytes >= 1000) {
-      "High Frequency High Volume"
-    } else {
-      "Unknown"
-    }
-  }
-
-  def printIPProfilesEnriched(profiles: Array[(String, IPProfileEnriched)]): Unit = {
-    println("\n--- IP Traffic Classification ---")
-    profiles.foreach { case (ip, profile) =>
-      println(
-        f"IP: $ip%-15s | " +
-          f"Class: ${profile.traffic_class}%-30s | " +
-          f"Connections: ${profile.connection_count}%5d | " +
-          f"Avg Bytes: ${profile.avg_bytes_sent}%10.2f | " +
-          f"Benign %%: ${profile.benign_percent}%6.2f%%%% | " +
-          f"Malicious %%: ${profile.malicious_percent}%6.2f%%%%"
-      )
-    }
-  }
-
-
-  def saveResults(sc: SparkContext,
-                  categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
-                  ipProfiles: org.apache.spark.rdd.RDD[(String, IPProfileEnriched)]): Unit = {
-    val outputPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\output"
-
-    try {
-      categoryStats
-        .map(s => s"${s.traffic_class},${s.label},${s.count},${s.avg_duration},${s.avg_bytes},${s.avg_packets}")
-        .saveAsTextFile(s"$outputPath/traffic_class_stats")
-
-      ipProfiles
-        .map { case (ip, p) =>
-          s"${p.id_orig_h},${p.avg_bytes_sent},${p.total_bytes_sent},${p.connection_count}," +
-            s"${p.avg_duration},${p.traffic_class},${p.benign_count},${p.malicious_count}," +
-            s"${p.benign_percent},${p.malicious_percent}"
-        }
-        .saveAsTextFile(s"$outputPath/ip_profiles_enriched")
-
-      println(s"\nResults saved to: $outputPath")
-    } catch {
-      case e: Exception => println(s"Warning: Could not save results - ${e.getMessage}")
-    }
   }
 }
