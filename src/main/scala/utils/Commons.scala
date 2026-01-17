@@ -6,8 +6,6 @@ import java.io.InputStream
 
 object Commons {
 
-
-
   object DeploymentMode extends Enumeration {
     type DeploymentMode = Value
     val local, remote = Value

@@ -11,6 +11,6 @@ object Config {
   // The path to the credentials file for AWS (if you follow instructions, this should not be updated)
   val credentialsPath :String = "/aws_credentials.txt"
 
-  val dataPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\BigData\\BigDataProject\\datasets\\dataset1.csv"
+  val dataPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset1.csv"
 
 }
