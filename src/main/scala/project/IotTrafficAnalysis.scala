@@ -47,38 +47,19 @@ object IoTTrafficAnalysis {
     // SECOND SHUFFLE: Join back with original dataset
     val trafficWithIP = dataRDD.map(r => (r.id_orig_h, r))
     val enrichedRDD = trafficWithIP
-      .leftOuterJoin(ipProfileRDD)
-      .map { case (ip, (record, profileOpt)) =>
-        val profile = profileOpt.getOrElse(
-          IPProfile(ip, 0.0, 0L, 0L, 0.0, "Unknown")
-        )
+      .join(ipProfileRDD)
+      .map { case (_, (record, profile)) =>
         EnrichedRecord(record, profile)
       }
 
     enrichedRDD.cache()
 
-//    // THIRD SHUFFLE: Compute traffic patterns by label
-//    val labelByCategory = enrichedRDD
-//      .map(e => ((e.profile.traffic_class, e.record.label), 1L))
-//      .reduceByKey(_ + _)
-//      .map { case ((trafficClass, label), count) => (trafficClass, Map(label -> count)) }
-//      .reduceByKey(_ ++ _)
-//      .map { case (trafficClass, countsMap) => createTrafficClassStats(trafficClass, countsMap) }
-//      //.sortBy(_.traffic_class)
-//
-//    printLabelDistribution(labelByCategory.take(20))
-
-    // versione migliore
-    // TODO: in realtà hai solo tolto un livello di aggregazione, hai tolo l'unione delle stesse classi, che era inutile, ma non è una vera ottimizzazione
     // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
       .map(e => ((e.profile.traffic_class, e.record.label), (e.record.orig_bytes, e.record.duration, e.record.orig_pkts, 1L)))
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
-      //.sortBy(cs => (cs.traffic_class, cs.label))
-    //.groupBy(_.traffic_class)
-      //.collect()
 
     printCategoryStats(categoryStats.take(20))
     // saveResults(sc, labelByCategory, ipProfileRDD)

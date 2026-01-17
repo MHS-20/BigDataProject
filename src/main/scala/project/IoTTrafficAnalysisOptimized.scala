@@ -1,10 +1,9 @@
-package project.optv2
+package project
 
 import org.apache.spark.{SparkConf, SparkContext}
 import project.IoTTrafficUtilities._
-import project.{CategoryStats, TrafficClassStats}
 
-object IoTTrafficAnalysisv2 {
+object IoTTrafficAnalysisOptimized {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis v2")
@@ -16,7 +15,7 @@ object IoTTrafficAnalysisv2 {
     val sc = new SparkContext(conf)
     sc.setLogLevel("ERROR")
 
-    println("=== IoT Traffic Analysis v2 (Optimized) ===")
+    println("=== IoT Traffic Analysis (Optimized) ===")
     val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
@@ -29,7 +28,7 @@ object IoTTrafficAnalysisv2 {
     dataRDD.cache()
     println(s"\nTotal records loaded: ${dataRDD.count()}")
 
-    // FIRST SHUFFLE: Aggregate by source IP with label distribution
+    // FIRST SHUFFLE: Aggregate by source IP with label distribution (counting malicious and benign)
     val ipProfileRDD = dataRDD
       .map { record =>
         val benignCount = if (record.label == "benign") 1L else 0L
@@ -45,78 +44,69 @@ object IoTTrafficAnalysisv2 {
         val trafficClass = classifyTraffic(count, avgBytes)
         val benignPercent = (benignCount.toDouble / count) * 100
         val maliciousPercent = (maliciousCount.toDouble / count) * 100
-
-        (ip, IPProfileEnriched(
-          ip,
-          avgBytes,
-          totalBytes,
-          count,
-          avgDur,
-          trafficClass,
-          benignCount,
-          maliciousCount,
-          benignPercent,
-          maliciousPercent
+        (ip, IPProfileEnriched(ip, avgBytes, totalBytes, count, avgDur, trafficClass, benignCount, maliciousCount, benignPercent, maliciousPercent
         ))
       }
 
     ipProfileRDD.cache()
     printIPProfilesEnriched(ipProfileRDD.take(20))
 
-    // SECOND SHUFFLE (CON JOIN): Statistical summary by category and label
-    // TODO: in teoria dovresti poterlo fare senza il join
-//    val categoryStats = dataRDD
-//      .map(record => (record.id_orig_h, record))
-//      .join(ipProfileRDD)
-//      .map { case (ip, (record, profile)) =>
-//        ((profile.traffic_class, record.label), (record.orig_bytes, record.duration, record.orig_pkts, 1L))
+    // SECOND SHUFFLE: statistical summary by category and label senza join
+//    val categoryStats = ipProfileRDD
+//      .flatMap { case (_, profile) =>
+//        // Per ogni IP generiamo una entry per ciascun label presente
+//        Seq(
+//          ("benign", profile.benign_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count),
+//          ("malicious", profile.malicious_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count)
+//        )
+//          .filter(_._2 > 0) // ignora label con count = 0
+//          .map { case (label, count, avgBytes, avgDur, totalConns) =>
+//            ((profile.traffic_class, label), (avgBytes * count, avgDur * count, count))
+//          }
 //      }
-//      .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) =>
-//        (b1 + b2, d1 + d2, p1 + p2, c1 + c2)
+//      .combineByKey(
+//        // createCombiner
+//        (v: (Double, Double, Long)) => v,
+//        // mergeValue (all’interno della stessa partizione)
+//        (acc: (Double, Double, Long), v: (Double, Double, Long)) =>
+//          (acc._1 + v._1, acc._2 + v._2, acc._3 + v._3),
+//        // mergeCombiners (tra partizioni)
+//        (acc1: (Double, Double, Long), acc2: (Double, Double, Long)) =>
+//          (acc1._1 + acc2._1, acc1._2 + acc2._2, acc1._3 + acc2._3)
+//      )
+//      .map { case ((trafficClass, label), (totBytes, totDur, totCount)) =>
+//        CategoryStats(
+//          trafficClass,
+//          label,
+//          totBytes / totCount,
+//          totDur / totCount,
+//          0.0,   // avg_packets: se serve, puoi aggiungerlo nello stesso modo
+//          totCount
+//        )
 //      }
-//      .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
-//        CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt)
-//      }
-//      // .sortBy(cs => (cs.traffic_class, cs.label))
 
-    // --- SECOND SHUFFLE (UNICO) ---
-    // Statistical summary by category and label senza join
-    val categoryStats = ipProfileRDD
-      .flatMap { case (_, profile) =>
-        // Per ogni IP generiamo una entry per ciascun label presente
-        Seq(
-          ("benign", profile.benign_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count),
-          ("malicious", profile.malicious_count, profile.avg_bytes_sent, profile.avg_duration, profile.connection_count)
-        )
-          .filter(_._2 > 0) // ignora label con count = 0
-          .map { case (label, count, avgBytes, avgDur, totalConns) =>
-            ((profile.traffic_class, label), (avgBytes * count, avgDur * count, count))
-          }
-      }
-      .combineByKey(
-        // createCombiner
-        (v: (Double, Double, Long)) => v,
-        // mergeValue (all’interno della stessa partizione)
-        (acc: (Double, Double, Long), v: (Double, Double, Long)) =>
-          (acc._1 + v._1, acc._2 + v._2, acc._3 + v._3),
-        // mergeCombiners (tra partizioni)
-        (acc1: (Double, Double, Long), acc2: (Double, Double, Long)) =>
-          (acc1._1 + acc2._1, acc1._2 + acc2._2, acc1._3 + acc2._3)
-      )
-      .map { case ((trafficClass, label), (totBytes, totDur, totCount)) =>
+    // crea una riga per ogni coppia (ip, label)
+    val perCategoryRDD = ipProfileRDD.flatMap { case (_, profile) =>
+      Seq(((profile.traffic_class, "benign"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.benign_count)),
+        ((profile.traffic_class, "malicious"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.malicious_count)))
+    }
+
+    val categoryStats = perCategoryRDD
+      .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
+      .map { case ((trafficClass, label), (totBytes, totDur, totPkts, count)) =>
         CategoryStats(
           trafficClass,
           label,
-          totBytes / totCount,
-          totDur / totCount,
-          0.0,   // avg_packets: se serve, puoi aggiungerlo nello stesso modo
-          totCount
+          avg_bytes    = totBytes.toDouble / count,
+          avg_duration = totDur / count,
+          avg_packets  = 0.0, // non disponibile nell’IPProfileEnriched
+          count        = count
         )
       }
 
     printCategoryStats(categoryStats.collect())
 
-    saveResults(sc, categoryStats, ipProfileRDD)
+   // saveResults(sc, categoryStats, ipProfileRDD)
 
     println("\n=== Analysis Complete ===")
     sc.stop()
