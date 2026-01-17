@@ -9,16 +9,16 @@ object IoTTrafficAnalysisOptimized {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis v2")
       .setMaster("local[*]")
-      .set("spark.driver.memory", "6g")
-      .set("spark.executor.memory", "6g")
-      .set("spark.driver.extraJavaOptions", "-Xmx6g -Xms4g")
+      .set("spark.driver.memory", "10g")
+      .set("spark.executor.memory", "10g")
+      .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
 
     val sc = new SparkContext(conf)
     initializeSparkContext("remote", sc)
     sc.setLogLevel("ERROR")
 
     println("=== IoT Traffic Analysis (Optimized) ===")
-    val rawData = sc.textFile(getDatasetPath("remote", "datasets/dataset18.csv"))
+    val rawData = sc.textFile(getDatasetPath(args{0}, args{1}))
     //val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()

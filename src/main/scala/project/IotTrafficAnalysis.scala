@@ -9,9 +9,9 @@ object IoTTrafficAnalysis {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis")
       .setMaster("local[*]")
-      .set("spark.driver.memory", "6g")
-      .set("spark.executor.memory", "6g")
-      .set("spark.driver.extraJavaOptions", "-Xmx6g -Xms4g")
+      .set("spark.driver.memory", "10g")
+      .set("spark.executor.memory", "10g")
+      .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
 
     val sc = new SparkContext(conf)
     initializeSparkContext("remote", sc)
@@ -64,7 +64,7 @@ object IoTTrafficAnalysis {
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
-    printCategoryStats(categoryStats.take(20))
+    printCategoryStats(categoryStats.collect())
     // saveResults(sc, labelByCategory, ipProfileRDD)
 
     println("\n=== Analysis Complete ===")
