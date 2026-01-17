@@ -33,40 +33,41 @@ object IoTTrafficAnalysisOptimized {
       .map { record =>
         val benignCount = if (record.label == "benign") 1L else 0L
         val maliciousCount = if (record.label == "malicious") 1L else 0L
-        (record.id_orig_h, (record.orig_bytes, record.duration, 1L, benignCount, maliciousCount))
+        (record.id_orig_h, (record.orig_bytes, record.duration, 1L, benignCount, maliciousCount, record.orig_pkts))
       }
-      .reduceByKey { case ((bytes1, dur1, count1, benign1, mal1), (bytes2, dur2, count2, benign2, mal2)) =>
-        (bytes1 + bytes2, dur1 + dur2, count1 + count2, benign1 + benign2, mal1 + mal2)
+      .reduceByKey { case ((bytes1, dur1, count1, benign1, mal1, pkts1), (bytes2, dur2, count2, benign2, mal2, pkts2)) =>
+        (bytes1 + bytes2, dur1 + dur2, count1 + count2, benign1 + benign2, mal1 + mal2, pkts1 + pkts2)
       }
-      .map { case (ip, (totalBytes, totalDur, count, benignCount, maliciousCount)) =>
+      .map { case (ip, (totalBytes, totalDur, count, benignCount, maliciousCount, totalPkts)) =>
         val avgBytes = totalBytes.toDouble / count
         val avgDur = totalDur / count
         val trafficClass = classifyTraffic(count, avgBytes)
         val benignPercent = (benignCount.toDouble / count) * 100
         val maliciousPercent = (maliciousCount.toDouble / count) * 100
-        (ip, IPProfileEnriched(ip, avgBytes, totalBytes, count, avgDur, trafficClass, benignCount, maliciousCount, benignPercent, maliciousPercent
+        (ip, IPProfileEnriched(ip, avgBytes, totalBytes, count, avgDur, totalPkts, trafficClass, benignCount, maliciousCount, benignPercent, maliciousPercent
         ))
       }
 
     ipProfileRDD.cache()
     printIPProfilesEnriched(ipProfileRDD.take(20))
 
-    // SECOND SHUFFLE: Statistical summary by category
     // crea una riga per ogni coppia (ip, security label)
     val perCategoryRDD = ipProfileRDD.flatMap { case (_, profile) =>
-      Seq(((profile.traffic_class, "benign"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.benign_count)),
-        ((profile.traffic_class, "malicious"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, 0L, profile.malicious_count)))
+      Seq(((profile.traffic_class, "benign"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, profile.total_packets, profile.benign_count)),
+        ((profile.traffic_class, "malicious"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, profile.total_packets, profile.malicious_count)))
     }
 
+    // SECOND SHUFFLE: Statistical summary by ip profile
     val categoryStats = perCategoryRDD
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((trafficClass, label), (totBytes, totDur, totPkts, count)) =>
+        val safeCount = if (count == 0) 1 else count
         CategoryStats(
           trafficClass,
           label,
-          avg_bytes    = totBytes.toDouble / count,
-          avg_duration = totDur / count,
-          avg_packets  = 0.0,
+          avg_bytes    = totBytes.toDouble / safeCount,
+          avg_duration = totDur / safeCount,
+          avg_packets  = totPkts.toDouble / safeCount,
           count        = count
         )
       }

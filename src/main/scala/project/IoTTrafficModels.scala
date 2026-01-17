@@ -43,6 +43,7 @@ case class IPProfileEnriched(
                               total_bytes_sent: Long,
                               connection_count: Long,
                               avg_duration: Double,
+                              total_packets: Long,
                               traffic_class: String,
                               benign_count: Long,
                               malicious_count: Long,
