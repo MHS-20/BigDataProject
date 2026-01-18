@@ -84,6 +84,7 @@ object IoTTrafficAnalysis {
 
     println("\n=== Analysis Complete ===")
     spark.stop()
+    spark.close()
     sc.stop()
   }
 }

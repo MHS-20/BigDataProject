@@ -5,22 +5,16 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SparkSession
 import utils.Commons.getChartPath
+import org.jfree.chart.axis.{SymbolAxis, NumberAxis}
 
 import java.io.{ByteArrayOutputStream, File}
 
 object IoTTrafficVisualization {
 
-  /** ============================================================
-   *   Utility: Save Breeze figure to Hadoop FS (local or S3)
-   * ============================================================ */
   private def saveFigure(f: Figure, dst: String, fs: FileSystem): Unit = {
-    val baos = new ByteArrayOutputStream()
-
-    // Breeze saves only to file path, so we save into temp file first
     val tmp = File.createTempFile("chart_", ".png")
     f.saveas(tmp.getAbsolutePath)
 
-    // Now write to Hadoop filesystem
     val outPath = new Path(dst)
     val outStream = fs.create(outPath, true)
 
@@ -31,9 +25,6 @@ object IoTTrafficVisualization {
     tmp.delete()
   }
 
-  /** ============================================================
-   *   Generate all charts (with S3-safe saving)
-   * ============================================================ */
   def generateAllCharts(
                          mode: String,
                          sc: SparkContext,
@@ -50,118 +41,237 @@ object IoTTrafficVisualization {
     if (fs.exists(chartPath)) fs.delete(chartPath, true)
     fs.mkdirs(chartPath)
 
-    saveCategoryStats(categoryStats.collect(), s"$outputDir/category_stats.png", fs)
-    saveBytesDistribution(ipProfiles.collect(), s"$outputDir/bytes_distribution.png", fs)
-    saveAvgBytes(ipProfiles.collect(), s"$outputDir/avg_bytes.png", fs)
-    saveTrafficClassDistribution(ipProfiles.collect(), s"$outputDir/traffic_class_distribution.png", fs)
-    saveBenignMalicious(categoryStats.collect(), s"$outputDir/benign_vs_malicious.png", fs)
+    println("\n=== Generating Charts ===")
+
+    val statsCollected = categoryStats.collect()
+    val profilesCollected = ipProfiles.collect()
+    val enrichedCollected = enriched.collect()
+
+    // 1. Distribuzione traffico per classe (con percentuali malicious)
+    saveTrafficClassAnalysis(statsCollected, s"$outputDir/1_traffic_by_class.png", fs)
+
+    // 2. Pattern comportamentali: bytes vs duration
+    saveBehavioralScatter(enrichedCollected, s"$outputDir/2_behavior_scatter.png", fs)
+
+    // 3. Top IP per volume di traffico
+    saveTopTalkers(profilesCollected, s"$outputDir/3_top_talkers.png", fs)
+
+    println(s"=== Charts saved to: $outputDir ===\n")
   }
 
   /** ============================================================
-   * 1. Traffic Class Stats
+   * 1. Analisi per Traffic Class con percentuale malicious
    * ============================================================ */
-  private def saveCategoryStats(stats: Seq[CategoryStats], out: String, fs: FileSystem): Unit = {
-    val grouped = stats.groupBy(_.traffic_class).mapValues(_.map(_.count).sum).toSeq
+  private def saveTrafficClassAnalysis(stats: Seq[CategoryStats], out: String, fs: FileSystem): Unit = {
+    // Calcola statistiche per classe
+    val byClass = stats.groupBy(_.traffic_class).map { case (tc, items) =>
+      val benignCount = items.filter(_.label == "benign").map(_.count).sum
+      val maliciousCount = items.filter(_.label != "benign").map(_.count).sum
+      val totalCount = benignCount + maliciousCount
+      val maliciousPercent = if (totalCount > 0) (maliciousCount.toDouble / totalCount) * 100 else 0.0
+
+      (tc, benignCount, maliciousCount, totalCount, maliciousPercent)
+    }.toSeq.sortBy(-_._4) // Ordina per totale decrescente
+
+    if (byClass.isEmpty) {
+      println("  ! No data for traffic class analysis")
+      return
+    }
+
+    val classes = byClass.map(_._1).toArray
+    val maliciousPercents = byClass.map(_._5).toArray
+    val totals = byClass.map(_._4).toArray
 
     val f = Figure()
-    val p = f.subplot(0)
+    f.width = 800
+    f.height = 500
 
-    p += breeze.plot.plot(
-      x = breeze.linalg.DenseVector((0 until grouped.size).map(_.toDouble).toArray),
-      y = breeze.linalg.DenseVector(grouped.map(_._2.toDouble).toArray)
+    // Subplot 1: Percentuale malicious per classe
+    val p1 = f.subplot(2, 1, 0)
+    val indices = (0 until classes.length).map(_.toDouble).toArray
+
+    p1 += plot(
+      breeze.linalg.DenseVector(indices),
+      breeze.linalg.DenseVector(maliciousPercents),
+      style = '+'
     )
 
-    p.xlabel = "Traffic Class"
-    p.ylabel = "Count"
-    p.title = "Traffic Class Counts"
+    val xaxis1 = new SymbolAxis("", classes)
+    p1.plot.setDomainAxis(xaxis1)
+    p1.ylabel = "Malicious %"
+    p1.title = "Security Risk by Traffic Class"
+
+    // Subplot 2: Volume totale connessioni
+    val p2 = f.subplot(2, 1, 1)
+    p2 += plot(
+      breeze.linalg.DenseVector(indices),
+      breeze.linalg.DenseVector(totals.map(_.toDouble)),
+      style = '-'
+    )
+
+    val xaxis2 = new SymbolAxis("Traffic Class", classes)
+    xaxis2.setVerticalTickLabels(true)
+    p2.plot.setDomainAxis(xaxis2)
+    p2.ylabel = "Total Connections"
+
+    println(s"  → traffic_by_class.png")
+    byClass.foreach { case (tc, b, m, t, mp) =>
+      println(f"     $tc%-30s: $t%7d connections ($mp%5.1f%% malicious)")
+    }
 
     saveFigure(f, out, fs)
   }
 
   /** ============================================================
-   * 2. Bytes Distribution Histogram
+   * 2. Scatter Plot Comportamentale: Bytes vs Duration
    * ============================================================ */
-  private def saveBytesDistribution(profiles: Array[(String, IPProfile)], out: String, fs: FileSystem): Unit = {
-    val values = profiles.map(_._2.total_bytes_sent.toDouble)
+  private def saveBehavioralScatter(enriched: Array[EnrichedRecord], out: String, fs: FileSystem): Unit = {
+    // Filtra record validi e rimuovi outlier estremi
+    val filtered = enriched.filter(e =>
+      e.record.duration > 0 &&
+        e.record.duration < 1000 && // Max 1000 secondi
+        e.record.orig_bytes > 0 &&
+        e.record.orig_bytes < 1e8 // Max 100MB
+    )
+
+    val benign = filtered.filter(_.record.label == "benign")
+    val malicious = filtered.filter(_.record.label != "benign")
+
+    // Campionamento per performance
+    val maxSample = 2000
+    val benignSample = if (benign.length > maxSample)
+      scala.util.Random.shuffle(benign.toSeq).take(maxSample).toArray
+    else benign
+
+    val maliciousSample = if (malicious.length > maxSample)
+      scala.util.Random.shuffle(malicious.toSeq).take(maxSample).toArray
+    else malicious
+
+    if (benignSample.isEmpty && maliciousSample.isEmpty) {
+      println("  ! No valid data for behavioral scatter")
+      return
+    }
 
     val f = Figure()
+    f.width = 800
+    f.height = 600
     val p = f.subplot(0)
 
-    p += hist(breeze.linalg.DenseVector(values), 50)
+    // Plot benign (blu)
+    if (benignSample.nonEmpty) {
+      val x = benignSample.map(e => math.log10(e.record.duration + 0.001))
+      val y = benignSample.map(e => math.log10(e.record.orig_bytes.toDouble + 1))
+      p += plot(
+        breeze.linalg.DenseVector(x),
+        breeze.linalg.DenseVector(y),
+        '.',
+        colorcode = "blue"
+      )
+    }
 
-    p.xlabel = "Total Bytes Sent"
-    p.ylabel = "Frequency"
-    p.title = "Distribution of Total Bytes Sent"
+    // Plot malicious (rosso) - sovrapposto
+    if (maliciousSample.nonEmpty) {
+      val x = maliciousSample.map(e => math.log10(e.record.duration + 0.001))
+      val y = maliciousSample.map(e => math.log10(e.record.orig_bytes.toDouble + 1))
+      p += plot(
+        breeze.linalg.DenseVector(x),
+        breeze.linalg.DenseVector(y),
+        '.',
+        colorcode = "red"
+      )
+    }
+
+    p.xlabel = "Log10(Duration [seconds])"
+    p.ylabel = "Log10(Bytes Sent)"
+    p.title = "Behavioral Patterns: Blue=Benign, Red=Malicious"
+
+    println(s"  → behavior_scatter.png")
+    println(f"     Benign: ${benignSample.length}%5d samples, Malicious: ${maliciousSample.length}%5d samples")
+
+    if (benign.nonEmpty) {
+      val avgDur = benign.map(_.record.duration).sum / benign.length
+      val avgBytes = benign.map(_.record.orig_bytes).sum / benign.length
+      println(f"     Benign avg: ${avgDur}%.2f s, ${avgBytes/1024}%.0f KB")
+    }
+
+    if (malicious.nonEmpty) {
+      val avgDur = malicious.map(_.record.duration).sum / malicious.length
+      val avgBytes = malicious.map(_.record.orig_bytes).sum / malicious.length
+      println(f"     Malicious avg: ${avgDur}%.2f s, ${avgBytes/1024}%.0f KB")
+    }
 
     saveFigure(f, out, fs)
   }
 
   /** ============================================================
-   * 3. Average Bytes per Traffic Class
+   * 3. Top Talkers - IP con più traffico
    * ============================================================ */
-  private def saveAvgBytes(profiles: Array[(String, IPProfile)], out: String, fs: FileSystem): Unit = {
-    val grouped = profiles
-      .groupBy(_._2.traffic_class)
-      .map { case (tc, arr) =>
-        tc -> arr.map(_._2.avg_bytes_sent).sum / arr.length
-      }.toSeq
+  private def saveTopTalkers(profiles: Array[(String, IPProfile)], out: String, fs: FileSystem): Unit = {
+    val topN = 20
+    val top = profiles
+      .filter(_._2.total_bytes_sent > 0)
+      .sortBy(-_._2.total_bytes_sent)
+      .take(topN)
+
+    if (top.isEmpty) {
+      println("  ! No data for top talkers")
+      return
+    }
+
+    // Prepara dati
+    val labels = top.zipWithIndex.map { case ((ip, profile), idx) =>
+      val shortIp = if (ip.length > 15) ip.take(12) + "..." else ip
+      val cls = profile.traffic_class
+      s"$shortIp [$cls]"
+    }
+
+    val bytesMB = top.map(_._2.total_bytes_sent.toDouble / (1024 * 1024))
+    val connections = top.map(_._2.connection_count.toDouble)
 
     val f = Figure()
-    val p = f.subplot(0)
+    f.width = 1000
+    f.height = 600
 
-    p += breeze.plot.plot(
-      x = breeze.linalg.DenseVector((0 until grouped.size).map(_.toDouble).toArray),
-      y = breeze.linalg.DenseVector(grouped.map(_._2).toArray)
+    // Subplot 1: Bytes inviati
+    val p1 = f.subplot(2, 1, 0)
+    val indices = (0 until top.length).map(_.toDouble).toArray
+
+    p1 += plot(
+      breeze.linalg.DenseVector(indices),
+      breeze.linalg.DenseVector(bytesMB),
+      style = '-'
     )
 
-    p.xlabel = "Traffic Class"
-    p.ylabel = "Avg Bytes"
-    p.title = "Average Bytes per Traffic Class"
+    val xaxis1 = new SymbolAxis("", labels)
+    xaxis1.setVerticalTickLabels(true)
+    p1.plot.setDomainAxis(xaxis1)
+    p1.ylabel = "MB Sent"
+    p1.title = s"Top $topN IPs by Traffic Volume"
 
-    saveFigure(f, out, fs)
-  }
-
-  /** ============================================================
-   * 4. Traffic Class Distribution
-   * ============================================================ */
-  private def saveTrafficClassDistribution(profiles: Array[(String, IPProfile)], out: String, fs: FileSystem): Unit = {
-    val grouped = profiles.groupBy(_._2.traffic_class).mapValues(_.length.toDouble).toSeq
-
-    val f = Figure()
-    val p = f.subplot(0)
-
-    p += breeze.plot.plot(
-      x = breeze.linalg.DenseVector((0 until grouped.size).map(_.toDouble).toArray),
-      y = breeze.linalg.DenseVector(grouped.map(_._2).toArray)
+    // Subplot 2: Numero di connessioni
+    val p2 = f.subplot(2, 1, 1)
+    p2 += plot(
+      breeze.linalg.DenseVector(indices),
+      breeze.linalg.DenseVector(connections),
+      style = '+'
     )
 
-    p.xlabel = "Traffic Class"
-    p.ylabel = "Count"
-    p.title = "Traffic Class Distribution"
+    val xaxis2 = new SymbolAxis("IP [Traffic Class]", labels)
+    xaxis2.setVerticalTickLabels(true)
+    p2.plot.setDomainAxis(xaxis2)
+    p2.ylabel = "Connections"
 
-    saveFigure(f, out, fs)
-  }
+    println(s"  → top_talkers.png (top $topN)")
+    val totalGB = bytesMB.sum / 1024.0
+    val totalConn = connections.sum.toLong
+    println(f"     Total: ${totalGB}%.2f GB, ${totalConn}%d connections")
 
-  /** ============================================================
-   * 5. Benign vs Malicious
-   * ============================================================ */
-  private def saveBenignMalicious(stats: Seq[CategoryStats], out: String, fs: FileSystem): Unit = {
-    val benign = stats.filter(_.label == "Benign").map(_.count).sum
-    val mal = stats.filter(_.label != "Benign").map(_.count).sum
-
-    val values = Seq(benign.toDouble, mal.toDouble)
-
-    val f = Figure()
-    val p = f.subplot(0)
-
-    p += breeze.plot.plot(
-      x = breeze.linalg.DenseVector(0.0, 1.0),
-      y = breeze.linalg.DenseVector(values.toArray)
-    )
-
-    p.xlabel = "Label"
-    p.ylabel = "Count"
-    p.title = "Benign vs Malicious Traffic"
+    // Mostra top 5
+    println("     Top 5:")
+    top.take(5).foreach { case (ip, profile) =>
+      val mb = profile.total_bytes_sent.toDouble / (1024 * 1024)
+      println(f"       $ip%-18s: ${mb}%8.2f MB, ${profile.connection_count}%6d conn [${profile.traffic_class}]")
+    }
 
     saveFigure(f, out, fs)
   }

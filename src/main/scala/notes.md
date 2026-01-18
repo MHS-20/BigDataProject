@@ -38,5 +38,33 @@ Spark's UI will be available at http://localhost:18080.
 Copy the dataset to S3:
 ```
 aws s3 cp datasets/dataset18-2.csv s3://mhs-lab1/datasets/datasetIoT.csv --region us-east-1 --no-verify-ssl
-
 ```
+
+Get Master Public DNS:
+```
+aws emr list-clusters --max-items 1
+aws emr describe-cluster --cluster-id j-20LZK4UL5O77V --query "Cluster.MasterPublicDnsName" --output text
+```
+
+Custom cluster resources:
+```
+aws emr create-cluster \
+    --name "Big Data Cluster" \
+    --release-label "emr-7.11.0" \
+    --applications Name=Hadoop Name=Spark \
+    --instance-groups \
+    InstanceGroupType=MASTER,InstanceCount=1,InstanceType=m5.xlarge \
+    InstanceGroupType=CORE,InstanceCount=2,InstanceType=m5.xlarge \
+    --service-role EMR_DefaultRole \
+    --ec2-attributes InstanceProfile=EMR_EC2_DefaultRole,KeyName=<my_key_pair_name> \
+    --region "us-east-1"
+```
+
+Spark submit to EMR:
+```
+--num-executors 2
+--executor-cores 2
+--executor-memory 6G
+--driver-memory 4G
+```
+
