@@ -3,6 +3,9 @@ package project
 import org.apache.spark.{SparkConf, SparkContext}
 import project.IoTTrafficUtilities._
 import utils.Commons._
+import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.types._
+
 
 object IoTTrafficAnalysisOptimized {
   def main(args: Array[String]): Unit = {
@@ -14,6 +17,7 @@ object IoTTrafficAnalysisOptimized {
       .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
 
     val sc = new SparkContext(conf)
+    val spark = SparkSession.builder().config(conf).getOrCreate()
     initializeSparkContext("remote", sc)
     sc.setLogLevel("ERROR")
 
@@ -76,8 +80,9 @@ object IoTTrafficAnalysisOptimized {
       }
 
     printCategoryStats(categoryStats.collect())
-    saveResultsOptimized(sc, args{0}, categoryStats, ipProfileRDD)
+    saveOptimizedResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
     println("\n=== Analysis Complete ===")
+    spark.stop()
     sc.stop()
   }
 }

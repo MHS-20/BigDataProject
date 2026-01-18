@@ -1,5 +1,6 @@
 package project
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 import project.IoTTrafficUtilities._
 import utils.Commons._
@@ -14,6 +15,7 @@ object IoTTrafficAnalysis {
       .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
 
     val sc = new SparkContext(conf)
+    val spark = SparkSession.builder().config(conf).getOrCreate()
     initializeSparkContext("remote", sc)
     sc.setLogLevel("ERROR")
 
@@ -65,35 +67,23 @@ object IoTTrafficAnalysis {
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
     printCategoryStats(categoryStats.collect())
-    saveResults(sc, args{0}, categoryStats, ipProfileRDD)
+    saveResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+    println("\n=== Analysis Complete ===")
 
     // ============= VISUALIZZAZIONI  =============
-//    println("\n=== Generating Visualizations ===")
-//
-//    try {
-//      // Genera tutti i grafici nella cartella "charts"
-//      IoTTrafficVisualization.generateAllCharts(
-//        categoryStats,
-//        ipProfileRDD,
-//        enrichedRDD,
-//        outputDir = "charts"
-//      )
-//
-//      println("\n✓ All visualizations saved in 'charts' directory")
-//      println("  - category_stats.png")
-//      println("  - bytes_distribution.png")
-//      println("  - bytes_vs_duration.png")
-//      println("  - avg_bytes.png")
-//      println("  - traffic_class_distribution.png")
-//      println("  - benign_vs_malicious.png")
-//
-//    } catch {
-//      case e: Exception =>
-//        println(s"✗ Error generating visualizations: ${e.getMessage}")
-//        e.printStackTrace()
-//    }
+    println("\n=== Generating Visualizations ===")
+
+    try {
+      IoTTrafficVisualization.generateAllCharts(args{0}, sc, spark, categoryStats, ipProfileRDD, enrichedRDD)
+      println("All visualizations saved in 'charts' directory")
+    } catch {
+      case e: Exception =>
+        println(s"Error generating charts: ${e.getMessage}")
+        e.printStackTrace()
+    }
 
     println("\n=== Analysis Complete ===")
+    spark.stop()
     sc.stop()
   }
 }

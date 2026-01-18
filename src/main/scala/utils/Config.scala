@@ -17,8 +17,12 @@ object Config {
   // The path to the dataset
   val dataPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets"
 
+  // The output paths
   val remoteOutputPath = "s3a://mhs-lab1/output"
-
   val localOutputPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\output"
+
+  // The charts paths
+  val localChartPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\charts"
+  val remoteChartPath = "s3a://mhs-lab1/charts"
 
 }

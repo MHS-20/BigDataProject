@@ -49,4 +49,13 @@ object Commons {
       return Config.remoteOutputPath
     }
   }
+
+  def getChartPath(deploymentMode: String): String = {
+    if(deploymentMode == "local"){
+      return Config.localChartPath
+    }
+    else{
+      return Config.remoteChartPath
+    }
+  }
 }

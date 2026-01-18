@@ -6,6 +6,9 @@ import org.apache.spark.SparkContext
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import org.apache.spark.sql.{SparkSession, Row}
+import org.apache.spark.sql.types._
+
 import utils.Commons._
 
 object IoTTrafficUtilities {
@@ -63,61 +66,84 @@ object IoTTrafficUtilities {
     }
   }
 
-  // -------------------- UTILITY FUNCTIONS --------------------
-  def saveResults(sc: SparkContext,
-                  mode: String,
-                  categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
-                  ipProfileRDD: org.apache.spark.rdd.RDD[(String, IPProfile)]
+  // -------------------- SERIALIZE FUNCTIONS --------------------
+  def saveResults(
+                   sc: SparkContext,
+                   spark: SparkSession,
+                   mode: String,
+                   categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
+                   ipProfileRDD: org.apache.spark.rdd.RDD[(String, IPProfile)]
                  ): Unit = {
-    println("\n--- Writing results to files ---")
-    // val outputPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\output"
+
+    import spark.implicits._
+
     val outputPath = getOutputPath(mode)
     val fs = FileSystem.get(sc.hadoopConfiguration)
-    if (fs.exists(new Path(s"$outputPath/v1"))) fs.delete(new Path(s"$outputPath/v1"), true)
 
-    // Save RDDs
-    categoryStats
-      .map(s => s"${s.traffic_class},${s.label},${s.count},${s.avg_duration},${s.avg_bytes},${s.avg_packets}")
-      .coalesce(1)
-      .saveAsTextFile(s"$outputPath/v1/traffic_class_stats")
+    val base = new Path(s"$outputPath/v1")
+    if (fs.exists(base)) fs.delete(base, true)
 
-    ipProfileRDD
-      .map { case (_, profile) =>
-        s"${profile.id_orig_h},${profile.avg_bytes_sent},${profile.total_bytes_sent},${profile.connection_count},${profile.avg_duration},${profile.traffic_class}"}
+    // Convert RDDs to DataFrames
+    val categoryDF = categoryStats.toDF()
+    val ipDF = ipProfileRDD.map(_._2).toDF()
+
+    // Save as CSV with header
+    categoryDF
       .coalesce(1)
-      .saveAsTextFile(s"$outputPath/v1/ip_profiles")
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv(s"$outputPath/v1/traffic_class_stats")
+
+    ipDF
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv(s"$outputPath/v1/ip_profiles")
+
+    println(s"\nResults saved to: $outputPath")
   }
 
-  def saveResultsOptimized(sc: SparkContext,
-                           mode: String,
-                           categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
-                  ipProfiles: org.apache.spark.rdd.RDD[(String, IPProfileEnriched)]): Unit = {
+  def saveOptimizedResults(
+                            sc: SparkContext,
+                            spark: SparkSession,
+                            mode: String,
+                            categoryStats: org.apache.spark.rdd.RDD[CategoryStats],
+                            ipProfiles: org.apache.spark.rdd.RDD[(String, IPProfileEnriched)]
+                          ): Unit = {
+
+    import spark.implicits._
+
     val outputPath = getOutputPath(mode)
-    // val outputPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\output"
     val fs = FileSystem.get(sc.hadoopConfiguration)
-    if (fs.exists(new Path(s"$outputPath/v2"))) fs.delete(new Path(s"$outputPath/v2"), true)
 
-    try {
-      categoryStats
-        .map(s => s"${s.traffic_class},${s.label},${s.count},${s.avg_duration},${s.avg_bytes},${s.avg_packets}")
-        .coalesce(1)
-        .saveAsTextFile(s"$outputPath/v2/traffic_class_stats")
+    val base = new Path(s"$outputPath/v2")
+    if (fs.exists(base)) fs.delete(base, true)
 
-      ipProfiles
-        .map { case (ip, p) =>
-          s"${p.id_orig_h},${p.avg_bytes_sent},${p.total_bytes_sent},${p.connection_count}," +
-            s"${p.avg_duration},${p.traffic_class},${p.benign_count},${p.malicious_count}," +
-            s"${p.benign_percent},${p.malicious_percent}"
-        }
-        .coalesce(1)
-        .saveAsTextFile(s"$outputPath/v2/ip_profiles")
+    // Convert RDDs to DataFrames
+    val categoryDF = categoryStats.toDF()
+    val ipDF = ipProfiles.map(_._2).toDF()
 
-      println(s"\nResults saved to: $outputPath")
-    } catch {
-      case e: Exception => println(s"Warning: Could not save results - ${e.getMessage}")
-    }
+    // Write CSV with header
+    categoryDF
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv(s"$outputPath/v2/traffic_class_stats")
+
+    ipDF
+      .coalesce(1)
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv(s"$outputPath/v2/ip_profiles")
+
+    println(s"\nResults saved to: $outputPath")
   }
 
+  // -------------------- UTILITY FUNCTIONS --------------------
   def createTrafficClassStats(trafficClass: String, countsMap: Map[String, Long]): TrafficClassStats = {
     val benign = countsMap.getOrElse("benign", 0L)
     val malicious = countsMap.getOrElse("malicious", 0L)
@@ -127,6 +153,7 @@ object IoTTrafficUtilities {
     TrafficClassStats(trafficClass, benign, malicious, total, benignPercent, maliciousPercent)
   }
 
+  // -------------------- PARSING FUNCTIONS --------------------
   // Helper function to parse CSV line
   def parseLine(line: String): Option[TrafficRecord] = {
     try {
