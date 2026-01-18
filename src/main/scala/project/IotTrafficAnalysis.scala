@@ -45,7 +45,7 @@ object IoTTrafficAnalysis {
       }
 
     ipProfileRDD.cache()
-    printIPProfiles(ipProfileRDD.take(20))
+    printIPProfiles(ipProfileRDD.collect())
 
     // SECOND SHUFFLE: Join back with original dataset
     val trafficWithIP = dataRDD.map(r => (r.id_orig_h, r))
@@ -65,7 +65,33 @@ object IoTTrafficAnalysis {
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
     printCategoryStats(categoryStats.collect())
-    // saveResults(sc, labelByCategory, ipProfileRDD)
+    saveResults(sc, args{0}, categoryStats, ipProfileRDD)
+
+    // ============= VISUALIZZAZIONI  =============
+//    println("\n=== Generating Visualizations ===")
+//
+//    try {
+//      // Genera tutti i grafici nella cartella "charts"
+//      IoTTrafficVisualization.generateAllCharts(
+//        categoryStats,
+//        ipProfileRDD,
+//        enrichedRDD,
+//        outputDir = "charts"
+//      )
+//
+//      println("\n✓ All visualizations saved in 'charts' directory")
+//      println("  - category_stats.png")
+//      println("  - bytes_distribution.png")
+//      println("  - bytes_vs_duration.png")
+//      println("  - avg_bytes.png")
+//      println("  - traffic_class_distribution.png")
+//      println("  - benign_vs_malicious.png")
+//
+//    } catch {
+//      case e: Exception =>
+//        println(s"✗ Error generating visualizations: ${e.getMessage}")
+//        e.printStackTrace()
+//    }
 
     println("\n=== Analysis Complete ===")
     sc.stop()

@@ -60,7 +60,7 @@ object IoTTrafficAnalysisOptimized {
         ((profile.traffic_class, "malicious"), (profile.total_bytes_sent, profile.avg_duration * profile.connection_count, profile.total_packets, profile.malicious_count)))
     }
 
-    // SECOND SHUFFLE: Statistical summary by ip profile
+    // SECOND SHUFFLE: Statistical summary by traffc profile
     val categoryStats = perCategoryRDD
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((trafficClass, label), (totBytes, totDur, totPkts, count)) =>
@@ -76,7 +76,7 @@ object IoTTrafficAnalysisOptimized {
       }
 
     printCategoryStats(categoryStats.collect())
-   // saveResultsOptimized(sc, categoryStats, ipProfileRDD)
+    saveResultsOptimized(sc, args{0}, categoryStats, ipProfileRDD)
     println("\n=== Analysis Complete ===")
     sc.stop()
   }

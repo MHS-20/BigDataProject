@@ -7,8 +7,8 @@ object CSVLabelCleaner {
 
   def main(args: Array[String]): Unit = {
 
-    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset5.csv"
-    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset5-2.csv"
+    val inputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset18.csv"
+    val outputFile = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset18-2.csv"
 
     val source = Source.fromFile(inputFile)
     val writer = new PrintWriter(outputFile)

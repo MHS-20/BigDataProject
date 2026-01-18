@@ -40,4 +40,13 @@ object Commons {
   def getDatasetPath(deploymentMode: String, path: String): String = {
     return getDatasetPath(deploymentMode, path, path)
   }
+
+  def getOutputPath(deploymentMode: String): String = {
+    if(deploymentMode == "local"){
+      return Config.localOutputPath
+    }
+    else{
+      return Config.remoteOutputPath
+    }
+  }
 }
