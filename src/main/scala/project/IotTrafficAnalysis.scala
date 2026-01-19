@@ -51,44 +51,55 @@ object IoTTrafficAnalysis {
       }
 
     ipProfileRDD.cache()
-    printIPProfiles(ipProfileRDD.collect())
+//    if (args{0} == "remote")
+//      printIPProfiles(ipProfileRDD.collect())
+//    else
+//      printIPProfilesLocal(ipProfileRDD.collect())
 
     // SECOND SHUFFLE: Join back with original dataset
-    val trafficWithIP = dataRDD.map(r => (r.id_orig_h, r))
-    val enrichedRDD = trafficWithIP
-      .join(ipProfileRDD)
-      .map { case (_, (record, profile)) =>
-        EnrichedRecord(record, profile)
+    val trafficLean = dataRDD.map(r => (r.id_orig_h, (r.orig_bytes, r.duration, r.orig_pkts, r.label)))
+    val profileLean = ipProfileRDD.map { case (ip, profile) => (ip, profile.traffic_class) }
+
+    val enrichedRDD = trafficLean
+      .join(profileLean)
+      .map { case (ip, ((orig_bytes, duration, orig_pkts, label), traffic_class)) =>
+        EnrichedRecordLean(ip, orig_bytes, duration, orig_pkts, label, traffic_class)
       }
 
     enrichedRDD.cache()
 
     // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
-      .map(e => ((e.profile.traffic_class, e.record.label), (e.record.orig_bytes, e.record.duration, e.record.orig_pkts, 1L)))
+      .map(e => ((e.traffic_class, e.label), (e.orig_bytes, e.duration, e.orig_pkts, 1L)))
       .reduceByKey { case ((b1, d1, p1, c1), (b2, d2, p2, c2)) => (b1 + b2, d1 + d2, p1 + p2, c1 + c2) }
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
-    printCategoryStats(categoryStats.collect())
-    saveResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+//    if (args{0} == "remote")
+//      printCategoryStats(categoryStats.collect())
+//    else
+//      printCategoryStatsLocal(categoryStats.collect())
+    // saveResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+
+//    import spark.implicits._
+//    val categoryDF = categoryStats.toDF()
+//    categoryDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
+//
+//    val ipProfileDF = ipProfileRDD.toDF()
+//    ipProfileDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
+
     println("\n=== Analysis Complete ===")
 
-    // ============= VISUALIZZAZIONI =============
-    println("\n=== Generating Visualizations ===")
-
-    try {
-      IoTTrafficVisualization.generateAllCharts(args{0}, sc, spark, categoryStats, ipProfileRDD, enrichedRDD)
-      println("All visualizations saved in 'charts' directory")
-    } catch {
-      case e: Exception =>
-        println(s"Error generating charts: ${e.getMessage}")
-        e.printStackTrace()
-    }
-
-    println("\n=== Analysis Complete ===")
     spark.stop()
-    spark.close()
+    //spark.close()
     sc.stop()
   }
 }

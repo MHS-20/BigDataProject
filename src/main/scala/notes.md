@@ -39,6 +39,12 @@ Copy the dataset to S3:
 aws s3 cp datasets/dataset18-2.csv s3://mhs-lab1/datasets/datasetIoT.csv --region us-east-1 --no-verify-ssl
 ```
 
+Copy output folder from S3 to local:
+``` 
+aws s3 cp s3://mhs-lab1/output/ output --recursive
+``` 
+
+
 Get Master Public DNS:
 ```
 aws emr list-clusters --max-items 1

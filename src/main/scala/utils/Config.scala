@@ -24,5 +24,4 @@ object Config {
   // The charts paths
   val localChartPath = "C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\charts"
   val remoteChartPath = "s3a://mhs-lab1/charts"
-
 }

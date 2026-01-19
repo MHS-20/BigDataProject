@@ -56,6 +56,15 @@ case class EnrichedRecord(
                            profile: IPProfile
                          )
 
+case class EnrichedRecordLean(
+                               ip: String,
+                               orig_bytes: Long,
+                               duration: Double,
+                               orig_pkts: Long,
+                               label: String,
+                               traffic_class: String
+                             )
+
 case class TrafficClassStats(
                               traffic_class: String,
                               benign: Long,

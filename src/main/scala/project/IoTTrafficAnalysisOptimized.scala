@@ -6,7 +6,6 @@ import utils.Commons._
 import org.apache.spark.sql.{SparkSession, Row}
 import org.apache.spark.sql.types._
 
-
 object IoTTrafficAnalysisOptimized {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
@@ -59,7 +58,10 @@ object IoTTrafficAnalysisOptimized {
       }
 
     ipProfileRDD.cache()
-    printIPProfilesEnriched(ipProfileRDD.take(20))
+//    if (args{0} == "remote")
+//      printIPProfilesEnriched(ipProfileRDD.collect())
+//    else
+//      printIPProfilesEnrichedLocal(ipProfileRDD.collect())
 
     // crea una riga per ogni coppia (ip, security label)
     val perCategoryRDD = ipProfileRDD.flatMap { case (_, profile) =>
@@ -82,8 +84,27 @@ object IoTTrafficAnalysisOptimized {
         )
       }
 
-    printCategoryStats(categoryStats.collect())
-    saveOptimizedResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+//    if (args{0} == "remote")
+//      printCategoryStats(categoryStats.collect())
+//    else
+//      printCategoryStatsLocal(categoryStats.collect())
+    //saveOptimizedResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+//
+//    import spark.implicits._
+//    val categoryDF = categoryStats.toDF()
+//    categoryDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v2/categoryStats/")
+//
+//    val ipProfileDF = ipProfileRDD.toDF()
+//    ipProfileDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v2/ipProfiles/")
+
     println("\n=== Analysis Complete ===")
     spark.stop()
     sc.stop()

@@ -29,7 +29,7 @@ object IoTTrafficUtilities {
     }
   }
 
-  // -------------------- PRINT FUNCTIONS --------------------
+  // -------------------- REMOTE PRINT FUNCTIONS --------------------
   def writeToS3(path: String, content: String): Unit = {
     val conf = new Configuration()
     val fs = FileSystem.get(new java.net.URI(path), conf)
@@ -40,13 +40,78 @@ object IoTTrafficUtilities {
   }
 
   def printIPProfiles(profiles: Array[(String, IPProfile)]): Unit = {
+    val sb = new StringBuilder
+    sb.append("\n--- IP Traffic Classification ---\n")
+
+    profiles.foreach { case (ip, profile) =>
+      sb.append(
+        f"IP: $ip%-15s | Class: ${profile.traffic_class}%-30s | " +
+          f"Connections: ${profile.connection_count}%5d | Avg Bytes: ${profile.avg_bytes_sent}%10.2f\n"
+      )
+    }
+
+    writeToS3("s3a://mhs-lab1/output/v1/logs1.txt", sb.toString)
+  }
+
+  def printLabelDistribution(stats: Array[TrafficClassStats]): Unit = {
+    val sb = new StringBuilder
+    sb.append("\n--- Label Distribution by Traffic Category ---\n")
+    sb.append(f"${"Traffic Category"}%-30s | ${"Benign"}%-12s | ${"Malicious"}%-12s | ${"Total"}%-12s | ${"Benign %"}%-10s | ${"Malicious %"}%-12s\n")
+    sb.append("-" * 110 + "\n")
+
+    stats.foreach { stat =>
+      sb.append(
+        f"${stat.traffic_class}%-30s | ${stat.benign}%12d | ${stat.malicious}%12d | " +
+          f"${stat.total}%12d | ${stat.benign_percent}%9.2f%% | ${stat.malicious_percent}%11.2f%%\n"
+      )
+    }
+
+    writeToS3("s3a://mhs-lab1/output/v1/logs2.txt", sb.toString)
+  }
+
+  def printCategoryStats(categoryStats: Array[CategoryStats]): Unit = {
+    val sb = new StringBuilder
+    sb.append("\n--- Statistical Summary by Traffic Category ---\n")
+    sb.append(f"${"Traffic Category"}%-30s | ${"Label"}%-10s | ${"Avg Bytes"}%-12s | ${"Avg Duration"}%-12s | ${"Avg Packets"}%-12s | ${"Count"}%-12s\n")
+    sb.append("-" * 120 + "\n")
+
+    categoryStats.foreach { cs =>
+      sb.append(
+        f"${cs.traffic_class}%-30s | ${cs.label}%-10s | ${cs.avg_bytes}%12.2f | " +
+          f"${cs.avg_duration}%12.6f | ${cs.avg_packets}%12.2f | ${cs.count}%12d\n"
+      )
+    }
+
+    writeToS3("s3a://mhs-lab1/output/logs3.txt", sb.toString)
+  }
+
+  def printIPProfilesEnriched(profiles: Array[(String, IPProfileEnriched)]): Unit = {
+    val sb = new StringBuilder
+    sb.append("\n--- IP Traffic Classification ---\n")
+
+    profiles.foreach { case (ip, profile) =>
+      sb.append(
+        f"IP: $ip%-15s | " +
+          f"Class: ${profile.traffic_class}%-30s | " +
+          f"Connections: ${profile.connection_count}%5d | " +
+          f"Avg Bytes: ${profile.avg_bytes_sent}%10.2f | " +
+          f"Benign %%: ${profile.benign_percent}%6.2f%%%% | " +
+          f"Malicious %%: ${profile.malicious_percent}%6.2f%%%%\n"
+      )
+    }
+
+    writeToS3("s3a://mhs-lab1/output/v2/logs4.txt", sb.toString)
+  }
+
+  // -------------------- LOCAL PRINT FUNCTIONS --------------------
+  def printIPProfilesLocal(profiles: Array[(String, IPProfile)]): Unit = {
     println("\n--- IP Traffic Classification ---")
     profiles.foreach { case (ip, profile) =>
       println(f"IP: $ip%-15s | Class: ${profile.traffic_class}%-30s | Connections: ${profile.connection_count}%5d | Avg Bytes: ${profile.avg_bytes_sent}%10.2f")
     }
   }
 
-  def printLabelDistribution(stats: Array[TrafficClassStats]): Unit = {
+  def printLabelDistributionLocal(stats: Array[TrafficClassStats]): Unit = {
     println("\n--- Label Distribution by Traffic Category ---")
     println(f"${"Traffic Category"}%-30s | ${"Benign"}%-12s | ${"Malicious"}%-12s | ${"Total"}%-12s | ${"Benign %"}%-10s | ${"Malicious %"}%-12s")
     println("-" * 110)
@@ -55,7 +120,7 @@ object IoTTrafficUtilities {
     }
   }
 
-  def printCategoryStats(categoryStats: Array[CategoryStats]): Unit = {
+  def printCategoryStatsLocal(categoryStats: Array[CategoryStats]): Unit = {
     println("\n--- Statistical Summary by Traffic Category ---")
     println(f"${"Traffic Category"}%-30s | ${"Label"}%-10s | ${"Avg Bytes"}%-12s | ${"Avg Duration"}%-12s | ${"Avg Packets"}%-12s | ${"Count"}%-12s")
     println("-" * 120)
@@ -64,7 +129,7 @@ object IoTTrafficUtilities {
     }
   }
 
-  def printIPProfilesEnriched(profiles: Array[(String, IPProfileEnriched)]): Unit = {
+  def printIPProfilesEnrichedLocal(profiles: Array[(String, IPProfileEnriched)]): Unit = {
     println("\n--- IP Traffic Classification ---")
     profiles.foreach { case (ip, profile) =>
       println(
