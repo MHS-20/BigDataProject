@@ -1,0 +1,10 @@
+
+--- Statistical Summary by Traffic Category ---
+Traffic Category               | Label      | Avg Bytes    | Avg Duration | Avg Packets  | Count       
+------------------------------------------------------------------------------------------------------------------------
+Low Activity                   | benign     |         1.10 |     0.050015 |         1.05 |         8317
+Normal Activity                | malicious  |      1308.00 |   557.802335 |       846.00 |            0
+Normal Activity                | benign     |         1.58 |     0.672862 |         1.02 |          829
+Low Activity                   | malicious  |      9148.00 |   415.976630 |      8726.00 |            0
+High Frequency Low Volume      | malicious  |         0.01 |     0.001616 |         1.03 |     53073800
+High Frequency Low Volume      | benign     |         0.26 |     0.062547 |        39.70 |      1371645

@@ -3,14 +3,12 @@ package project
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
 
 import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 
 import org.apache.spark.sql.{SparkSession, Row}
-import org.apache.spark.sql.types._
 
 import utils.Commons._
 
@@ -304,3 +302,9 @@ object IoTTrafficUtilities {
     }
   }
 }
+
+//    if (args{0} == "remote")
+//      printCategoryStats(categoryStats.collect())
+//    else
+//      printCategoryStatsLocal(categoryStats.collect())
+//saveOptimizedResults(sc, spark, args{0}, categoryStats, ipProfileRDD)

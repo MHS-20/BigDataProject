@@ -9,14 +9,9 @@ object IoTTrafficAnalysis {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis")
-      //.setMaster("local[*]")
-      //.set("spark.driver.memory", "4g")
-      //.set("spark.executor.memory", "4g")
-      //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
-
-//    conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-//    conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-
+    //.set("spark.driver.memory", "4g")
+    //.set("spark.executor.memory", "6g")
+    //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -25,7 +20,6 @@ object IoTTrafficAnalysis {
 
     println("=== IoT Traffic Analysis ===")
     val rawData = sc.textFile(getDatasetPath(args{0}, args{1}))
-    //val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
     val dataRDD = rawData
@@ -51,10 +45,6 @@ object IoTTrafficAnalysis {
       }
 
     ipProfileRDD.cache()
-//    if (args{0} == "remote")
-//      printIPProfiles(ipProfileRDD.collect())
-//    else
-//      printIPProfilesLocal(ipProfileRDD.collect())
 
     // SECOND SHUFFLE: Join back with original dataset
     val trafficLean = dataRDD.map(r => (r.id_orig_h, (r.orig_bytes, r.duration, r.orig_pkts, r.label)))
@@ -75,31 +65,24 @@ object IoTTrafficAnalysis {
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
-//    if (args{0} == "remote")
-//      printCategoryStats(categoryStats.collect())
-//    else
-//      printCategoryStatsLocal(categoryStats.collect())
-    // saveResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
+    import spark.implicits._
+    val categoryDF = categoryStats.toDF()
+    categoryDF
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
 
-//    import spark.implicits._
-//    val categoryDF = categoryStats.toDF()
-//    categoryDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
-//
-//    val ipProfileDF = ipProfileRDD.toDF()
-//    ipProfileDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
+    val ipProfileDF = ipProfileRDD.toDF()
+    ipProfileDF
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
 
     println("\n=== Analysis Complete ===")
 
     spark.stop()
-    //spark.close()
     sc.stop()
   }
 }

@@ -10,7 +10,6 @@ _*
 aws_credentials.txt
 .idea/
 metastore_db/
-outputOptimized/
 datasets/big/
 *.ppk
 aws/credentials

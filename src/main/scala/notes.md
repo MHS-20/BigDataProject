@@ -15,7 +15,6 @@ EnrichedRecord(
   )
 ```
 Ogni connessione viene arricchita con il profilo dell'ip sorgente e con le informazioni aggregate 
-(aggiungere il profilo ip ha senso, ma aggiungere anche tutte le informazioni aggregate non tanto)
 
 ### Third Shuffle
 Non posso riusare i dati aggregati dal primo shuffle, perché non ho contato le label malicious/benign.
@@ -23,8 +22,7 @@ Quindi devo ricalcolare i dati aggregati ma questa volta aggregando per profilo 
 
 ## Optimized
 Se nel primo shuffle conto anche il numero di label benign/malicious, 
-poi basta mettere il profilo come chiave insieme alla label,
-ed aggregare su quelle (questa allora sarà la versione ottimizzata)
+poi basta mettere il profilo come chiave insieme alla label, ed aggregare su quelle
 
 ## Remote Deployment
 History Server (gitbash):
@@ -39,22 +37,21 @@ Copy the dataset to S3:
 aws s3 cp datasets/dataset18-2.csv s3://mhs-lab1/datasets/datasetIoT.csv --region us-east-1 --no-verify-ssl
 ```
 
+Check for results:
+```
+aws s3api list-objects-v2 --bucket mhs-lab1
+aws s3api list-objects-v2 --bucket mhs-lab1 --prefix datasets/
+```
+
 Copy output folder from S3 to local:
 ``` 
 aws s3 cp s3://mhs-lab1/output/ output --recursive
-``` 
-
+```
 
 Get Master Public DNS:
 ```
 aws emr list-clusters --max-items 1
 aws emr describe-cluster --cluster-id j-20LZK4UL5O77V --query "Cluster.MasterPublicDnsName" --output text
-```
-
-Monitor Job: 
-```
-aws emr list-steps --cluster-id j-XXXXXXXXXXXXX --step-states PENDING RUNNING
-aws emr list-steps --cluster-id j-XXXXXXXXXXXXX --step-states COMPLETED FAILED CANCELLED
 ```
 
 Custom cluster resources:
@@ -71,25 +68,10 @@ aws emr create-cluster \
     --region "us-east-1"
 ```
 
-Check for results: 
-```
-aws s3api list-objects-v2 --bucket mhs-lab1
-aws s3api list-objects-v2 --bucket mhs-lab1 --prefix datasets/
-```
-
 Spark submit to EMR:
 ```
---num-executors 2
---executor-cores 2
---executor-memory 6G
---driver-memory 4G
-
 --num-executors 2
 --executor-cores 4
 --executor-memory 12G
 --driver-memory 4G
---conf spark.sql.shuffle.partitions=8
 ```
-
-j-3FVG8GH9MP1FX
-ec2-54-80-25-6.compute-1.amazonaws.com

@@ -10,13 +10,9 @@ object IoTTrafficAnalysisOptimized {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis v2")
-      //.setMaster("local[*]")
       //.set("spark.driver.memory", "4g")
-      //.set("spark.executor.memory", "4g")
+      //.set("spark.executor.memory", "6g")
       //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
-
-//    conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-//    conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -25,7 +21,6 @@ object IoTTrafficAnalysisOptimized {
 
     println("=== IoT Traffic Analysis (Optimized) ===")
     val rawData = sc.textFile(getDatasetPath(args{0}, args{1}))
-    //val rawData = sc.textFile("C:\\Users\\muham\\Desktop\\Coding\\Unibo\\Corsi\\BigData\\BigDataProject\\datasets\\dataset52.csv")
 
     val header = rawData.first()
     val dataRDD = rawData
@@ -58,10 +53,6 @@ object IoTTrafficAnalysisOptimized {
       }
 
     ipProfileRDD.cache()
-//    if (args{0} == "remote")
-//      printIPProfilesEnriched(ipProfileRDD.collect())
-//    else
-//      printIPProfilesEnrichedLocal(ipProfileRDD.collect())
 
     // crea una riga per ogni coppia (ip, security label)
     val perCategoryRDD = ipProfileRDD.flatMap { case (_, profile) =>
@@ -84,26 +75,20 @@ object IoTTrafficAnalysisOptimized {
         )
       }
 
-//    if (args{0} == "remote")
-//      printCategoryStats(categoryStats.collect())
-//    else
-//      printCategoryStatsLocal(categoryStats.collect())
-    //saveOptimizedResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
-//
-//    import spark.implicits._
-//    val categoryDF = categoryStats.toDF()
-//    categoryDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v2/categoryStats/")
-//
-//    val ipProfileDF = ipProfileRDD.toDF()
-//    ipProfileDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v2/ipProfiles/")
+    import spark.implicits._
+    val categoryDF = categoryStats.toDF()
+    categoryDF
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv("s3a://mhs-lab1/output/v2/categoryStats/")
+
+    val ipProfileDF = ipProfileRDD.toDF()
+    ipProfileDF
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv("s3a://mhs-lab1/output/v2/ipProfiles/")
 
     println("\n=== Analysis Complete ===")
     spark.stop()
