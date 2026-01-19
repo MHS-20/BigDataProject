@@ -11,10 +11,13 @@ object IoTTrafficAnalysisOptimized {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis v2")
-      .setMaster("local[*]")
-      .set("spark.driver.memory", "10g")
-      .set("spark.executor.memory", "10g")
-      .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
+      //.setMaster("local[*]")
+      //.set("spark.driver.memory", "4g")
+      //.set("spark.executor.memory", "4g")
+      //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
+
+//    conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+//    conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()

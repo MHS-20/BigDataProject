@@ -1,4 +1,3 @@
-
 ## Not Optimized
 ### First Shuffle
 Aggregare i dati basandosi sull'ip sorgente, calcolo la somma dei bytes e della durata. 
@@ -46,6 +45,12 @@ aws emr list-clusters --max-items 1
 aws emr describe-cluster --cluster-id j-20LZK4UL5O77V --query "Cluster.MasterPublicDnsName" --output text
 ```
 
+Monitor Job: 
+```
+aws emr list-steps --cluster-id j-XXXXXXXXXXXXX --step-states PENDING RUNNING
+aws emr list-steps --cluster-id j-XXXXXXXXXXXXX --step-states COMPLETED FAILED CANCELLED
+```
+
 Custom cluster resources:
 ```
 aws emr create-cluster \
@@ -56,8 +61,14 @@ aws emr create-cluster \
     InstanceGroupType=MASTER,InstanceCount=1,InstanceType=m5.xlarge \
     InstanceGroupType=CORE,InstanceCount=2,InstanceType=m5.xlarge \
     --service-role EMR_DefaultRole \
-    --ec2-attributes InstanceProfile=EMR_EC2_DefaultRole,KeyName=<my_key_pair_name> \
+    --ec2-attributes InstanceProfile=EMR_EC2_DefaultRole,KeyName=my_key_pair \
     --region "us-east-1"
+```
+
+Check for results: 
+```
+aws s3api list-objects-v2 --bucket mhs-lab1
+aws s3api list-objects-v2 --bucket mhs-lab1 --prefix datasets/
 ```
 
 Spark submit to EMR:
@@ -66,5 +77,13 @@ Spark submit to EMR:
 --executor-cores 2
 --executor-memory 6G
 --driver-memory 4G
+
+--num-executors 2
+--executor-cores 4
+--executor-memory 12G
+--driver-memory 4G
+--conf spark.sql.shuffle.partitions=8
 ```
 
+j-3FVG8GH9MP1FX
+ec2-54-80-25-6.compute-1.amazonaws.com

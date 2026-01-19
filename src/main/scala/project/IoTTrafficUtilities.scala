@@ -2,7 +2,10 @@ package project
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 
@@ -27,6 +30,15 @@ object IoTTrafficUtilities {
   }
 
   // -------------------- PRINT FUNCTIONS --------------------
+  def writeToS3(path: String, content: String): Unit = {
+    val conf = new Configuration()
+    val fs = FileSystem.get(new java.net.URI(path), conf)
+    val output = fs.create(new Path(path), true)
+    val writer = new OutputStreamWriter(output, "UTF-8")
+    writer.write(content)
+    writer.close()
+  }
+
   def printIPProfiles(profiles: Array[(String, IPProfile)]): Unit = {
     println("\n--- IP Traffic Classification ---")
     profiles.foreach { case (ip, profile) =>
@@ -81,7 +93,7 @@ object IoTTrafficUtilities {
     val fs = FileSystem.get(sc.hadoopConfiguration)
 
     val base = new Path(s"$outputPath/v1")
-    if (fs.exists(base)) fs.delete(base, true)
+    // if (fs.exists(base)) fs.delete(base, true)
 
     // Convert RDDs to DataFrames
     val categoryDF = categoryStats.toDF()
@@ -119,7 +131,7 @@ object IoTTrafficUtilities {
     val fs = FileSystem.get(sc.hadoopConfiguration)
 
     val base = new Path(s"$outputPath/v2")
-    if (fs.exists(base)) fs.delete(base, true)
+    // if (fs.exists(base)) fs.delete(base, true)
 
     // Convert RDDs to DataFrames
     val categoryDF = categoryStats.toDF()

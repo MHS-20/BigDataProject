@@ -4,6 +4,7 @@ dataset12*
 dataset14*
 unione*
 +.png
+*.pem
 _*
 src/main/resources/aws_credentials.txt
 .idea/

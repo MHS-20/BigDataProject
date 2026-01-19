@@ -9,10 +9,14 @@ object IoTTrafficAnalysis {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis")
-      .setMaster("local[*]")
-      .set("spark.driver.memory", "10g")
-      .set("spark.executor.memory", "10g")
-      .set("spark.driver.extraJavaOptions", "-Xmx8g -Xms6g")
+      //.setMaster("local[*]")
+      //.set("spark.driver.memory", "4g")
+      //.set("spark.executor.memory", "4g")
+      //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
+
+//    conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+//    conf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -70,7 +74,7 @@ object IoTTrafficAnalysis {
     saveResults(sc, spark, args{0}, categoryStats, ipProfileRDD)
     println("\n=== Analysis Complete ===")
 
-    // ============= VISUALIZZAZIONI  =============
+    // ============= VISUALIZZAZIONI =============
     println("\n=== Generating Visualizations ===")
 
     try {
