@@ -32,6 +32,12 @@ bin/spark-class.cmd org.apache.spark.deploy.history.HistoryServer
 ```
 Spark's UI will be available at http://localhost:18080.
 
+Set AWS credentials and config file paths:
+```
+export AWS_SHARED_CREDENTIALS_FILE=aws/credentials
+export AWS_CONFIG_FILE=aws/config
+```
+
 Copy the dataset to S3:
 ```
 aws s3 cp datasets/dataset18-2.csv s3://mhs-lab1/datasets/datasetIoT.csv --region us-east-1 --no-verify-ssl
@@ -75,3 +81,6 @@ Spark submit to EMR:
 --executor-memory 12G
 --driver-memory 4G
 ```
+
+j-2UC645BL7U4WP
+ec2-107-23-205-237.compute-1.amazonaws.com

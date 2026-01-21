@@ -9,9 +9,12 @@ object IoTTrafficAnalysis {
   def main(args: Array[String]): Unit = {
     val conf = new SparkConf()
       .setAppName("IoT Traffic Analysis")
-    //.set("spark.driver.memory", "4g")
-    //.set("spark.executor.memory", "6g")
-    //.set("spark.driver.extraJavaOptions", "-Xmx4g -Xms2g")
+//    .set("spark.executor.instances", "2")
+//    .set("spark.executor.cores", "4")
+//    .set("spark.executor.memory", "12g")
+//    .set("spark.driver.memory", "8g")
+//    .set("spark.sql.shuffle.partitions", "8")
+//    .set("spark.default.parallelism", "8")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -19,7 +22,7 @@ object IoTTrafficAnalysis {
     sc.setLogLevel("ERROR")
 
     println("=== IoT Traffic Analysis ===")
-    val rawData = sc.textFile(getDatasetPath(args{0}, args{1}))
+    val rawData = sc.textFile(getDatasetPath(args(0), args(1)))
 
     val header = rawData.first()
     val dataRDD = rawData
@@ -28,8 +31,8 @@ object IoTTrafficAnalysis {
       .filter(_.isDefined)
       .map(_.get)
 
-    dataRDD.cache()
-    println(s"\nTotal records loaded: ${dataRDD.count()}")
+    //dataRDD.cache()
+    //println(s"\nTotal records loaded: ${dataRDD.count()}")
 
     // FIRST SHUFFLE: Aggregate by source IP to calculate traffic profile
     val ipProfileRDD = dataRDD
@@ -44,7 +47,7 @@ object IoTTrafficAnalysis {
         (ip, IPProfile(ip, avgBytes, totalBytes, count, avgDur, trafficClass))
       }
 
-    ipProfileRDD.cache()
+    //ipProfileRDD.cache()
 
     // SECOND SHUFFLE: Join back with original dataset
     val trafficLean = dataRDD.map(r => (r.id_orig_h, (r.orig_bytes, r.duration, r.orig_pkts, r.label)))
@@ -56,7 +59,7 @@ object IoTTrafficAnalysis {
         EnrichedRecordLean(ip, orig_bytes, duration, orig_pkts, label, traffic_class)
       }
 
-    enrichedRDD.cache()
+    //enrichedRDD.cache()
 
     // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
@@ -65,20 +68,23 @@ object IoTTrafficAnalysis {
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
-    import spark.implicits._
-    val categoryDF = categoryStats.toDF()
-    categoryDF
-      .write
-      .option("header", "true")
-      .mode("overwrite")
-      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
+    categoryStats.take(20)
 
-    val ipProfileDF = ipProfileRDD.toDF()
-    ipProfileDF
-      .write
-      .option("header", "true")
-      .mode("overwrite")
-      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
+//    import spark.implicits._
+//    val categoryDF = categoryStats.toDF()
+//    categoryDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
+      //.parquet("s3a://mhs-lab1/output/v1/categoryStats/")
+    
+    //    val ipProfileDF = ipProfileRDD.toDF()
+//    ipProfileDF
+//      .write
+//      .option("header", "true")
+//      .mode("overwrite")
+//      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
 
     println("\n=== Analysis Complete ===")
 
