@@ -11,10 +11,8 @@ object IoTTrafficAnalysis {
       .setAppName("IoT Traffic Analysis")
 //    .set("spark.executor.instances", "2")
 //    .set("spark.executor.cores", "4")
-//    .set("spark.executor.memory", "12g")
+//    .set("spark.executor.memory", "10g")
 //    .set("spark.driver.memory", "8g")
-//    .set("spark.sql.shuffle.partitions", "8")
-//    .set("spark.default.parallelism", "8")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -31,9 +29,6 @@ object IoTTrafficAnalysis {
       .filter(_.isDefined)
       .map(_.get)
 
-    //dataRDD.cache()
-    //println(s"\nTotal records loaded: ${dataRDD.count()}")
-
     // FIRST SHUFFLE: Aggregate by source IP to calculate traffic profile
     val ipProfileRDD = dataRDD
       .map(record => (record.id_orig_h, (record.orig_bytes, record.duration, 1L)))
@@ -47,8 +42,6 @@ object IoTTrafficAnalysis {
         (ip, IPProfile(ip, avgBytes, totalBytes, count, avgDur, trafficClass))
       }
 
-    //ipProfileRDD.cache()
-
     // SECOND SHUFFLE: Join back with original dataset
     val trafficLean = dataRDD.map(r => (r.id_orig_h, (r.orig_bytes, r.duration, r.orig_pkts, r.label)))
     val profileLean = ipProfileRDD.map { case (ip, profile) => (ip, profile.traffic_class) }
@@ -59,8 +52,6 @@ object IoTTrafficAnalysis {
         EnrichedRecordLean(ip, orig_bytes, duration, orig_pkts, label, traffic_class)
       }
 
-    //enrichedRDD.cache()
-
     // THIRD SHUFFLE: Statistical summary by category
     val categoryStats = enrichedRDD
       .map(e => ((e.traffic_class, e.label), (e.orig_bytes, e.duration, e.orig_pkts, 1L)))
@@ -69,22 +60,6 @@ object IoTTrafficAnalysis {
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
     categoryStats.take(20)
-
-//    import spark.implicits._
-//    val categoryDF = categoryStats.toDF()
-//    categoryDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
-      //.parquet("s3a://mhs-lab1/output/v1/categoryStats/")
-    
-    //    val ipProfileDF = ipProfileRDD.toDF()
-//    ipProfileDF
-//      .write
-//      .option("header", "true")
-//      .mode("overwrite")
-//      .csv("s3a://mhs-lab1/output/v1/ipProfiles/")
 
     println("\n=== Analysis Complete ===")
 
