@@ -12,8 +12,8 @@ object IoTTrafficAnalysisOptimized {
       .setAppName("IoT Traffic Analysis v2")
     //.set("spark.executor.instances", "2")
     //.set("spark.executor.cores", "4")
-    //.set("spark.executor.memory", "10g")
-    //.set("spark.driver.memory", "4g")
+    //.set("spark.executor.memory", "18g")
+    //.set("spark.driver.memory", "8g")
 
     val sc = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -82,13 +82,6 @@ object IoTTrafficAnalysisOptimized {
       .option("header", "true")
       .mode("overwrite")
       .csv("s3a://mhs-lab1/output/v2/categoryStats/")
-
-    val ipProfileDF = ipProfileRDD.toDF()
-    ipProfileDF
-      .write
-      .option("header", "true")
-      .mode("overwrite")
-      .csv("s3a://mhs-lab1/output/v2/ipProfiles/")
 
     println("\n=== Analysis Complete ===")
     spark.stop()

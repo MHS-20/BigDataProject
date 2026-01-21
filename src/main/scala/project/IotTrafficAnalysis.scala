@@ -11,7 +11,7 @@ object IoTTrafficAnalysis {
       .setAppName("IoT Traffic Analysis")
 //    .set("spark.executor.instances", "2")
 //    .set("spark.executor.cores", "4")
-//    .set("spark.executor.memory", "10g")
+//    .set("spark.executor.memory", "18g")
 //    .set("spark.driver.memory", "8g")
 
     val sc = new SparkContext(conf)
@@ -59,7 +59,15 @@ object IoTTrafficAnalysis {
       .map { case ((tc, lbl), (totB, totD, totP, cnt)) =>
         CategoryStats(tc, lbl, totB.toDouble / cnt, totD / cnt, totP.toDouble / cnt, cnt) }
 
-    categoryStats.take(20)
+   // categoryStats.take(20)
+
+    import spark.implicits._
+    val categoryDF = categoryStats.toDF()
+    categoryDF
+      .write
+      .option("header", "true")
+      .mode("overwrite")
+      .csv("s3a://mhs-lab1/output/v1/categoryStats/")
 
     println("\n=== Analysis Complete ===")
 
